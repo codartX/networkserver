@@ -4,9 +4,9 @@ INCLUDES=-I$(PYPREFIX)/include/python$(PYVERSION) -I./
 LINK=-lpython$(PYVERSION) 
 
 
-all : network_server
+all : networkserver
 
-network_server: main.o forward.so database.so message.so parser.so pkt_rx.so 
+networkserver: main.o forward.so database.so message.so parser.so pkt_rx.so 
 	$(CC) -o $@ $^ $(INCLUDES) $(LINK)
 
 main.o: main.c
@@ -46,5 +46,5 @@ pkt_rx.c: pkt_rx.pyx
 	cython pkt_rx.pyx 
 
 clean: 
-	@rm -rf *.c *.o *.so network_server 2> /dev/null 
+	@rm -rf *.c *.o *.so networkserver 2> /dev/null 
  

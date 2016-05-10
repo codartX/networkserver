@@ -3,8 +3,6 @@
 import logging
 import os, sys
 from multiprocessing import Process, Queue
-from kafka.client import KafkaClient
-from kafka.producer import SimpleProducer
 import psycopg2
 import binascii
 import json
@@ -29,13 +27,11 @@ default_key = [0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15,
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 class MsgParserProcess(Process):
-    def __init__(self, kafka_addr, kafka_port, db_host, db_port, db_user, db_pwd, memcached_list, msg_queue):
+    def __init__(self, zmq_sock, db_host, db_port, db_user, db_pwd, memcached_list, msg_queue):
         super(MsgParserProcess, self).__init__()
         self.queue = msg_queue
+        self.zmq_sock = zmq_sock
         try:
-            self.client = KafkaClient(str(kafka_addr) + ':' + str(kafka_port))
-            self.kafka_conn = SimpleProducer(self.client)
-
             self.conn = psycopg2.connect(database='lora', user=db_user, password=db_pwd, host=db_host, port=db_port)   
             self.db = self.conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
@@ -128,7 +124,7 @@ class MsgParserProcess(Process):
             
             app_id = self.node_model.get_node_app_id(dev_addr) 
             if app_id:
-                self.kafka_conn.send_messages(app_id, msg.payload)
+                self.zmq_sock.send('%s %s' % (app_id, msg.payload))
             else:
                 logging.error('App ID does not exist')
                 return

@@ -1,10 +1,4 @@
 {
-    "kafka_cfg": {
-        "host": "10.75.212.143",
-        "port": 19092,
-        "ns_id": "80188"
-    },
-
     "database_cfg": {
         "host": "localhost",
         "port": 5432,
@@ -18,6 +12,7 @@
 
     "process_num": 5,
 
-    "local_port": 1680 
+    "local_port": 1680, 
 
+    "zmq_port": 60000 
 }

@@ -2,26 +2,15 @@
 # coding=utf-8
 import logging
 import sys,os, signal, getopt
-import SocketServer
 import socket
 import json
+import zmq
+import time
 from parser import MsgParserProcess
 import multiprocessing
 from forward import ForwardProcess
 from pkt_rx import RxProcess
 
-g_msg_queue = multiprocessing.Queue()
-
-class TCPHandler(SocketServer.BaseRequestHandler):
-    def handle(self):
-        # self.request is the TCP socket connected to the client
-        buf = bytearray(512)
-        length = self.request.recv_into(buf)
-        try:
-            g_msg_queue.put({'addr':self.client_address[0], 'data':buf, 'len': length, 'sock': self.request})
-        except Exception, e:
-            logging.error('Enqueue fail,error:' % str(e))
-            g_msg_queue.close()
 
 def main():
     try:
@@ -32,17 +21,24 @@ def main():
         print 'Wrong format config file, ', e
         sys.exit()
 
-    if not 'kafka_cfg' in config_json or not 'database_cfg' in config_json or not 'mc_list' in config_json or not 'process_num' in config_json or not 'local_port' in config_json:
+    if not 'database_cfg' in config_json or not 'mc_list' in config_json or not 'process_num' in config_json or not 'local_port' in config_json or not 'zmq_port' in config_json:
         print 'Config file invalid'
         sys.exit()
 
+    context = zmq.Context()
+    socket = context.socket(zmq.PUB)
+    socket.bind('tcp://*:%d' % (config_json['zmq_port']))
+    msg_queue = multiprocessing.Queue()
     process_pool = []
 
     try:
         for i in range(int(config_json['process_num'])):
-            p = MsgParserProcess(config_json['kafka_cfg']['host'], config_json['kafka_cfg']['port'], config_json['database_cfg']['host'],
-                                 config_json['database_cfg']['port'], config_json['database_cfg']['username'], config_json['database_cfg']['password'],
-                                 config_json['mc_list'], g_msg_queue)
+            p = MsgParserProcess(socket, 
+                                 config_json['database_cfg']['host'],
+                                 config_json['database_cfg']['port'], 
+                                 config_json['database_cfg']['username'], 
+                                 config_json['database_cfg']['password'],
+                                 config_json['mc_list'], msg_queue)
             p.daemon = True
             process_pool.append(p)
             p.start()
@@ -50,7 +46,7 @@ def main():
         p.daemon = True
         p.start()
         
-        p = RxProcess('0.0.0.0', config_json['local_port'], g_msg_queue)
+        p = RxProcess('0.0.0.0', config_json['local_port'], msg_queue)
         p.daemon = True
         p.start()
 
@@ -62,6 +58,7 @@ def main():
         process.join()
 
     p.join()
+    msg_queue.close()
 
 if __name__ == "__main__":
     #logging.basicConfig(
